@@ -49,7 +49,8 @@ http://YOUR_SERVER:9990/ui/setup
 - `UI_PASSWORD` enables login protection for the web UI
 - `STREAM_PROVIDER_URLS` accepts one provider URL per line
 - full manifest URLs are accepted and normalized automatically
-- `SOOTIO_URL` is optional and kept only as a legacy fallback
+- `AIOSTREAM_URL` is the preferred env var for the legacy AIOStreams fallback
+- `SOOTIO_URL` is still supported as a backward-compatible alias
 
 ## Current Limitations
 
