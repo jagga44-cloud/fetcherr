@@ -67,25 +67,17 @@ http://YOUR_SERVER:9990/ui/setup
 
 ## Tips
 
-<div style="border-left:4px solid #22c55e; padding:10px 14px; margin:12px 0; background:rgba(34,197,94,.08); border-radius:8px;">
-  <strong>Tip</strong><br>
-  Provider order matters. Earlier providers are tried first.
-</div>
+> [!TIP]
+> Provider order matters. Earlier providers are tried first.
 
-<div style="border-left:4px solid #a855f7; padding:10px 14px; margin:12px 0; background:rgba(168,85,247,.08); border-radius:8px;">
-  <strong>Audio</strong><br>
-  <code>ENGLISH_STREAM_MODE=require</code> is the strictest option for English audio.
-</div>
+> [!IMPORTANT]
+> `ENGLISH_STREAM_MODE=require` is the strictest option for English audio.
 
-<div style="border-left:4px solid #60a5fa; padding:10px 14px; margin:12px 0; background:rgba(96,165,250,.08); border-radius:8px;">
-  <strong>Compatibility</strong><br>
-  Full manifest URLs are accepted and normalized automatically. <code>SOOTIO_URL</code> is still supported as a backward-compatible alias for <code>AIOSTREAM_URL</code>.
-</div>
+> [!NOTE]
+> Full manifest URLs are accepted and normalized automatically. `SOOTIO_URL` is still supported as a backward-compatible alias for `AIOSTREAM_URL`.
 
-<div style="border-left:4px solid #f59e0b; padding:10px 14px; margin:12px 0; background:rgba(245,158,11,.08); border-radius:8px;">
-  <strong>Real-Debrid</strong><br>
-  Real-Debrid multi-location and IP restrictions still apply.
-</div>
+> [!WARNING]
+> Real-Debrid multi-location and IP restrictions still apply.
 
 ## Current Limitations
 
