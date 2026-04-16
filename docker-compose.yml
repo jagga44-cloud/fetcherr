@@ -12,7 +12,6 @@ services:
       DATABASE_PATH: /app/data/fetcherr.db
       TMDB_API_KEY: "${TMDB_API_KEY}"
       AIOSTREAM_URL: "${AIOSTREAM_URL:-}"
-      SOOTIO_URL: "${SOOTIO_URL:-}"
       STREAM_PROVIDER_URLS: "${STREAM_PROVIDER_URLS:-}"
       ENGLISH_STREAM_MODE: "${ENGLISH_STREAM_MODE:-prefer}"
       SERVER_NAME: "${SERVER_NAME:-Fetcherr}"
@@ -22,7 +21,7 @@ services:
       TRAKT_CLIENT_SECRET: "${TRAKT_CLIENT_SECRET}"
       TRAKT_USERNAME: "${TRAKT_USERNAME}"
       TRAKT_LISTS: "${TRAKT_LISTS:-}"
-      SERVER_URL: "${SERVER_URL:-http://10.10.30.3:9990}"
+      SERVER_URL: "${SERVER_URL:-http://localhost:9990}"
       UI_USERNAME: "${UI_USERNAME:-admin}"
       UI_PASSWORD: "${UI_PASSWORD:-}"
     volumes:
