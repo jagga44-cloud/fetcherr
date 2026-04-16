@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fetcherr · Settings</title>
+  <link rel="icon" type="image/svg+xml" href="/ui/static/fetcherr.svg">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #12151d; --surface-raised: #181c26;
+      --border: rgba(255,255,255,.07); --border-strong: rgba(255,255,255,.12);
+      --text: #eef2ff; --muted: #8892a4;
+      --accent: #9d6ef0; --accent-dim: rgba(157,110,240,.15); --accent-border: rgba(157,110,240,.35);
+      --green: #4ade80; --green-dim: rgba(74,222,128,.12); --green-border: rgba(74,222,128,.3);
+      --amber: #fbbf24; --amber-dim: rgba(251,191,36,.1); --amber-border: rgba(251,191,36,.28);
+      --red: #f87171; --red-dim: rgba(248,113,113,.1); --red-border: rgba(248,113,113,.28);
+      --blue: #60a5fa; --blue-dim: rgba(96,165,250,.1); --blue-border: rgba(96,165,250,.28);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .shell { max-width: 760px; margin: 0 auto; padding: 20px 20px 80px; }
+
+    /* Topbar */
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 28px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+    .brand-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-dim); border: 1px solid var(--accent-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .brand-icon svg { width: 16px; height: 16px; color: #c4b5fd; }
+    .brand-name { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+    .brand-tag { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+    .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; text-decoration: none; transition: color .15s, background .15s; }
+    .icon-btn:hover { color: var(--text); background: var(--surface-raised); }
+
+    /* Page header */
+    .page-header { margin-bottom: 24px; }
+    .page-header h1 { margin: 0 0 4px; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+    .page-header p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    /* Section */
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; margin-bottom: 16px; }
+    .section-title { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+    .optional-tag { font-size: 10px; font-weight: 500; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--surface-raised); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; }
+
+    /* Fields */
+    .field { margin-bottom: 14px; }
+    .field:last-child { margin-bottom: 0; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 520px) { .field-grid { grid-template-columns: 1fr; } }
+    label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: .03em; text-transform: uppercase; }
+    input, select, textarea { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); font-size: 14px; font-family: inherit; outline: none; transition: border-color .15s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent-border); }
+    input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus { -webkit-box-shadow: 0 0 0 1000px var(--surface-raised) inset; -webkit-text-fill-color: var(--text); caret-color: var(--text); transition: background-color 5000s ease-in-out 0s; }
+    textarea { resize: vertical; min-height: 116px; max-width: 100%; line-height: 1.45; }
+    .field-note { margin-top: 6px; font-size: 12px; color: var(--muted); }
+    .input-row { display: flex; gap: 8px; }
+    .input-row input { flex: 1; }
+    .provider-list { display: flex; flex-direction: column; gap: 8px; }
+    .provider-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+    .provider-row .btn { padding: 10px 12px; }
+    .provider-actions { margin-top: 10px; }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-raised); color: var(--text); font-size: 14px; font-family: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s, border-color .15s; }
+    .btn:hover { background: rgba(255,255,255,.06); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-sm { padding: 7px 12px; font-size: 13px; }
+    .btn-primary { background: var(--accent-dim); border-color: var(--accent-border); color: #d8c6ff; }
+    .btn-primary:hover { background: rgba(157,110,240,.22); }
+    .btn-primary.saved { background: var(--green-dim); border-color: var(--green-border); color: #bbf7d0; }
+
+    /* Status row */
+    .status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,.02); margin-top: 10px; }
+    .status-meta { font-size: 13px; color: var(--muted); min-width: 0; }
+    .status-meta strong { display: block; color: var(--text); font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .status-meta .detail { font-size: 12px; color: var(--muted); }
+
+    /* Pill */
+    .pill { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; border: 1px solid var(--border); color: var(--muted); background: transparent; }
+    .pill.ok { border-color: var(--green-border); background: var(--green-dim); color: #bbf7d0; }
+    .pill.pending { border-color: var(--amber-border); background: var(--amber-dim); color: #fef3c7; }
+    .pill.err { border-color: var(--red-border); background: var(--red-dim); color: #fecaca; }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .8; flex-shrink: 0; }
+
+    /* Callout */
+    .callout { margin-top: 14px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,.03); color: var(--muted); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+    .callout a { color: #c4b5fd; }
+    .callout.success { color: #bbf7d0; border-color: var(--green-border); background: var(--green-dim); }
+    .callout.error { color: #fecaca; border-color: var(--red-border); background: var(--red-dim); }
+    .callout.info { color: #bfdbfe; border-color: var(--blue-border); background: var(--blue-dim); }
+    .checklist { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+    .check-item {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,.02);
+    }
+    .check-item input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; }
+    .check-meta { min-width: 0; }
+    .check-title { font-size: 14px; color: var(--text); }
+    .check-slug { font-size: 12px; color: var(--muted); }
+
+    /* Button row */
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+
+    /* Save bar */
+    .save-bar { position: sticky; bottom: 20px; margin-top: 20px; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border); background: rgba(18,21,29,.92); backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .save-bar p { margin: 0; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Topbar -->
+  <nav class="topbar">
+    <a href="/ui/dashboard" class="brand">
+      <div class="brand-icon">
+        <img src="/ui/static/fetcherr.svg" alt="Fetcherr" style="width:24px;height:24px;">
+      </div>
+      <div>
+        <div class="brand-name">Fetcherr</div>
+      </div>
+    </a>
+    <div class="topbar-right">
+      <a class="icon-btn" href="/ui/logs" title="Logs">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </a>
+      <a class="icon-btn" href="/ui/dashboard" title="Library">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Settings</h1>
+    <p>Configure credentials and library behavior. Changes apply immediately.</p>
+  </div>
+
+  <!-- AIOStreams -->
+  <div class="section">
+    <div class="section-title">AIOStreams</div>
+    <div class="field">
+      <label>URL</label>
+      <input id="sootioUrl" type="url" placeholder="https://your-aiostreams.example.com">
+      <div class="field-note">Optional legacy fallback for stream lookups. You can paste the full AIOStreams <code>manifest.json</code> URL.</div>
+    </div>
+    <div class="field">
+      <label>Direct Stream Providers</label>
+      <div id="streamProviderList" class="provider-list"></div>
+      <div class="provider-actions">
+        <button type="button" class="btn btn-sm" onclick="addProviderRow()">+ Add Provider</button>
+      </div>
+      <div class="field-note">Optional. Query provider base URLs directly and rank the results. Paste one full manifest or base URL per line.</div>
+    </div>
+    <div class="field">
+      <label>English Audio</label>
+      <select id="englishStreamMode">
+        <option value="prefer">Prefer English when available</option>
+        <option value="require">Require English markers</option>
+        <option value="off">Do not rank by English markers</option>
+      </select>
+      <div class="field-note">Use provider metadata to prefer or require likely-English results. Ambiguous matches can still be verified during playback.</div>
+    </div>
+  </div>
+
+  <!-- Real-Debrid -->
+  <div class="section">
+    <div class="section-title">Real-Debrid</div>
+    <div class="field">
+      <label>API Key</label>
+      <div class="input-row">
+        <input id="rdApiKey" type="password" placeholder="Enter your Real-Debrid API key">
+        <button class="btn btn-sm" onclick="validateRD()">Validate</button>
+      </div>
+    </div>
+    <div class="status-row">
+      <div class="status-meta">
+        <strong>Real-Debrid</strong>
+        <div class="detail" id="rdMeta">—</div>
+      </div>
+      <div id="rdStatus" class="pill">Not validated</div>
+    </div>
+  </div>
+
+  <!-- TMDB -->
+  <div class="section">
+    <div class="section-title">TMDB <span class="optional-tag">Required for Search</span></div>
+    <div class="field">
+      <label>API Key</label>
+      <input id="tmdbApiKey" type="password" placeholder="Enter your TMDB API key">
+      <div class="field-note">Used for metadata, artwork, and Add to Library search.</div>
+    </div>
+  </div>
+
+  <!-- Server -->
+  <div class="section">
+    <div class="section-title">Server</div>
+    <div class="field">
+      <label>Server URL</label>
+      <input id="serverUrl" type="url" placeholder="http://your-server:9990">
+      <div class="field-note">The external URL clients should use for playback redirects.</div>
+    </div>
+  </div>
+
+  <!-- Trakt -->
+  <div class="section">
+    <div class="section-title">Trakt</div>
+    <div class="field-grid field">
+      <div>
+        <label>Client ID</label>
+        <input id="traktClientId" placeholder="Trakt client ID">
+      </div>
+      <div>
+        <label>Client Secret</label>
+        <input id="traktClientSecret" type="password" placeholder="Trakt client secret">
+      </div>
+    </div>
+    <div class="status-row">
+      <div class="status-meta">
+        <strong>Trakt</strong>
+        <div class="detail" id="traktMeta">Checking…</div>
+      </div>
+      <div id="traktStatus" class="pill">—</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="connectTrakt()">Connect Trakt</button>
+    </div>
+    <div id="traktCallout" class="callout info" style="display:none"></div>
+    <div class="field-note" style="margin-top:14px">Choose which Trakt lists to sync in addition to your movie and show watchlists.</div>
+    <div id="traktLists" class="checklist">
+      <div class="field-note">Connect Trakt to load your lists.</div>
+    </div>
+  </div>
+
+  <!-- Save bar -->
+  <div class="save-bar">
+    <p>Save to apply changes immediately. No restart needed.</p>
+    <button class="btn btn-primary" id="saveBtn" onclick="saveSettings()">Save Settings</button>
+  </div>
+
+  <div id="out" class="callout" style="display:none;margin-top:14px"></div>
+</div>
+
+<script>
+  let selectedTraktLists = []
+
+  function providerPlaceholder(idx) {
+    return idx === 0
+      ? 'https://torrentio.strem.fun/realdebrid=...'
+      : 'https://addon.debridio.com/...'
+  }
+
+  function collectProviderUrls() {
+    return [...document.querySelectorAll('.provider-url-input')]
+      .map(el => el.value.trim())
+      .filter(Boolean)
+  }
+
+  function renderProviderRows(urls = []) {
+    const list = document.getElementById('streamProviderList')
+    const values = urls.length ? urls : ['']
+    list.innerHTML = values.map((url, idx) => `
+      <div class="provider-row">
+        <input class="provider-url-input" type="url" placeholder="${providerPlaceholder(idx)}" value="${url.replace(/"/g, '&quot;')}">
+        <button type="button" class="btn btn-sm" onclick="removeProviderRow(this)">Remove</button>
+      </div>
+    `).join('')
+  }
+
+  function addProviderRow(value = '') {
+    const list = document.getElementById('streamProviderList')
+    const row = document.createElement('div')
+    row.className = 'provider-row'
+    const idx = list.children.length
+    row.innerHTML = `
+      <input class="provider-url-input" type="url" placeholder="${providerPlaceholder(idx)}" value="${value.replace(/"/g, '&quot;')}">
+      <button type="button" class="btn btn-sm" onclick="removeProviderRow(this)">Remove</button>
+    `
+    list.appendChild(row)
+  }
+
+  function removeProviderRow(btn) {
+    const list = document.getElementById('streamProviderList')
+    btn.closest('.provider-row')?.remove()
+    if (!list.children.length) renderProviderRows([''])
+  }
+
+  function setPill(id, text, kind = '') {
+    const el = document.getElementById(id)
+    el.className = ['pill', kind].filter(Boolean).join(' ')
+    const dot = kind ? `<span class="pill-dot"></span>` : ''
+    el.innerHTML = `${dot}<span>${text}</span>`
+  }
+
+  function showOut(msg, kind = '') {
+    const el = document.getElementById('out')
+    el.style.display = ''
+    el.className = ['callout', kind].filter(Boolean).join(' ')
+    el.textContent = msg
+  }
+
+  function maskKey(v) {
+    if (!v) return 'Not set'
+    if (v.length <= 8) return 'Configured'
+    return `${v.slice(0, 4)}••••${v.slice(-4)}`
+  }
+
+  async function loadSettings() {
+    const res = await fetch('/ui/settings-data')
+    if (!res.ok) return
+    const d = await res.json()
+    document.getElementById('sootioUrl').value         = d.sootioUrl         || ''
+    renderProviderRows((d.streamProviderUrls || '').split('\n').map(v => v.trim()).filter(Boolean))
+    document.getElementById('englishStreamMode').value = d.englishStreamMode || 'prefer'
+    document.getElementById('rdApiKey').value          = d.rdApiKey          || ''
+    document.getElementById('tmdbApiKey').value        = d.tmdbApiKey        || ''
+    document.getElementById('serverUrl').value         = d.serverUrl         || ''
+    document.getElementById('traktClientId').value     = d.traktClientId     || ''
+    document.getElementById('traktClientSecret').value = d.traktClientSecret || ''
+    selectedTraktLists = Array.isArray(d.traktLists) ? d.traktLists : []
+
+    if (d.rdApiKey) {
+      setPill('rdStatus', 'Configured', 'ok')
+      document.getElementById('rdMeta').textContent = maskKey(d.rdApiKey)
+    } else {
+      setPill('rdStatus', 'Not set', '')
+      document.getElementById('rdMeta').textContent = 'No API key configured'
+    }
+  }
+
+  async function loadTraktStatus() {
+    const res = await fetch('/trakt/auth')
+    if (!res.ok) return
+    const d = await res.json()
+    if (d.authenticated) {
+      setPill('traktStatus', 'Connected', 'ok')
+      document.getElementById('traktMeta').textContent = d.expiresAt
+        ? `Token expires ${new Date(d.expiresAt).toLocaleDateString()}`
+        : 'Authenticated'
+    } else {
+      setPill('traktStatus', 'Not connected', '')
+      document.getElementById('traktMeta').textContent = 'No active Trakt connection'
+    }
+  }
+
+  async function loadTraktLists() {
+    const el = document.getElementById('traktLists')
+    el.innerHTML = '<div class="field-note">Loading lists…</div>'
+    const res = await fetch('/ui/trakt/lists')
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      el.innerHTML = `<div class="field-note">${d.error || 'Unable to load Trakt lists.'}</div>`
+      return
+    }
+    const d = await res.json()
+    selectedTraktLists = Array.isArray(d.selected) ? d.selected : selectedTraktLists
+    if (!d.lists?.length) {
+      el.innerHTML = '<div class="field-note">No Trakt lists found for this account.</div>'
+      return
+    }
+    el.innerHTML = d.lists.map(list => `
+      <label class="check-item">
+        <input type="checkbox" value="${list.slug}" ${selectedTraktLists.includes(list.slug) ? 'checked' : ''} onchange="toggleTraktList(this)">
+        <div class="check-meta">
+          <div class="check-title">${list.name}</div>
+          <div class="check-slug">${list.slug}</div>
+        </div>
+      </label>
+    `).join('')
+  }
+
+  function toggleTraktList(input) {
+    const slug = input.value
+    if (input.checked) {
+      if (!selectedTraktLists.includes(slug)) selectedTraktLists.push(slug)
+    } else {
+      selectedTraktLists = selectedTraktLists.filter(v => v !== slug)
+    }
+  }
+
+  async function validateRD() {
+    const key = document.getElementById('rdApiKey').value.trim()
+    if (!key) { showOut('Enter an API key first.', 'error'); return }
+    const res = await fetch('https://api.real-debrid.com/rest/1.0/user', {
+      headers: { Authorization: `Bearer ${key}` }
+    })
+    if (res.ok) {
+      const d = await res.json()
+      setPill('rdStatus', 'Valid', 'ok')
+      document.getElementById('rdMeta').textContent = `Account: ${d.username || maskKey(key)}`
+      showOut('Real-Debrid API key is valid.', 'success')
+    } else {
+      setPill('rdStatus', 'Invalid', 'err')
+      document.getElementById('rdMeta').textContent = 'Key rejected by Real-Debrid'
+      showOut('Real-Debrid API key is invalid.', 'error')
+    }
+  }
+
+  async function connectTrakt() {
+    // Save client credentials first so the server uses the entered values
+    const saveRes = await fetch('/ui/settings-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        traktClientId:     document.getElementById('traktClientId').value,
+        traktClientSecret: document.getElementById('traktClientSecret').value,
+      }),
+    })
+    if (!saveRes.ok) { showOut('Save credentials before connecting.', 'error'); return }
+
+    const res = await fetch('/trakt/auth', { method: 'POST' })
+    const d   = await res.json()
+    if (!res.ok) { showOut(d.error || 'Failed to start Trakt auth.', 'error'); return }
+
+    const callout = document.getElementById('traktCallout')
+    callout.style.display = ''
+    callout.innerHTML = `1. Open <a href="${d.verificationUrl}" target="_blank">${d.verificationUrl}</a>\n2. Enter code: <strong>${d.code}</strong>\n3. This page will update automatically once authorized.`
+    setPill('traktStatus', 'Awaiting authorization', 'pending')
+    document.getElementById('traktMeta').textContent = 'Waiting for Trakt authorization…'
+
+    // Poll until authenticated
+    const pollId = setInterval(async () => {
+      const check = await fetch('/trakt/auth')
+      if (!check.ok) return
+      const status = await check.json()
+      if (status.authenticated) {
+        clearInterval(pollId)
+        callout.style.display = 'none'
+        setPill('traktStatus', 'Connected', 'ok')
+        document.getElementById('traktMeta').textContent = 'Trakt connected successfully'
+        showOut('Trakt connected. Your watchlist will sync on the next scheduled run.', 'success')
+        loadTraktLists()
+      }
+    }, 5000)
+    // Stop polling after 10 minutes
+    setTimeout(() => clearInterval(pollId), 600_000)
+  }
+
+  async function saveSettings() {
+    const body = {
+      sootioUrl:         document.getElementById('sootioUrl').value,
+      streamProviderUrls: collectProviderUrls().join('\n'),
+      englishStreamMode: document.getElementById('englishStreamMode').value,
+      rdApiKey:          document.getElementById('rdApiKey').value,
+      tmdbApiKey:        document.getElementById('tmdbApiKey').value,
+      serverUrl:         document.getElementById('serverUrl').value,
+      traktClientId:     document.getElementById('traktClientId').value,
+      traktClientSecret: document.getElementById('traktClientSecret').value,
+      traktLists:        selectedTraktLists,
+    }
+    const res = await fetch('/ui/settings-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      showOut(d.error || 'Failed to save settings.', 'error')
+      return
+    }
+    const btn = document.getElementById('saveBtn')
+    btn.classList.add('saved')
+    btn.innerHTML = `<svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Saved`
+    setTimeout(() => {
+      btn.classList.remove('saved')
+      btn.innerHTML = 'Save Settings'
+    }, 2500)
+  }
+
+  renderProviderRows([''])
+  loadSettings()
+  loadTraktStatus()
+  loadTraktLists()
+</script>
+</body>
+</html>

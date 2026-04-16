@@ -1,0 +1,316 @@
+import Fastify from 'fastify'
+import { config, normalizeSootioUrl, parseEnglishStreamMode, parseStreamProviderUrls, parseTraktLists } from './config.js'
+import { getDb, getAllSettings } from './db.js'
+import { jellyfinRoutes } from './jellyfin/index.js'
+import { castRoutes } from './cast/routes.js'
+import { initCastSchema } from './cast/db.js'
+import { uiRoutes } from './ui/routes.js'
+import { wrapFastifyLogger } from './logger.js'
+import { markSyncComplete } from './sync-state.js'
+import { cleanupRemovedTraktListSources, syncTraktWatchlist, syncTraktShowsWatchlist, syncTraktList, startDeviceAuth, tokenStatus } from './trakt.js'
+import { fetchRankedStreams, fetchRankedEpisodeStreams, extractHashFromStreamUrl } from './sootio.js'
+import { resolveStream, probeAudioLanguages, NotCachedError } from './rd.js'
+import { getMovieByTmdbId, getLatestSeasonNumberForShow, listLatestSeasonShowSubscriptions, listMovies, listShows, pruneAllOrphanedMovies, pruneAllOrphanedShows, upsertManualShowSubscription } from './db.js'
+import { ensureShowSeasonsCached, refreshShowMetadataIfNeeded, refreshMovieMetadataIfNeeded } from './tmdb.js'
+
+const app = Fastify({
+  logger: { level: 'info' },
+  routerOptions: { ignoreTrailingSlash: true },
+  rewriteUrl: (req) => req.url!.replace(/\/\/+/g, '/'),
+})
+
+// Initialise DB
+getDb()
+initCastSchema()
+
+// Apply any DB-persisted settings on top of env vars
+{
+  const s = getAllSettings()
+  if (s.sootioUrl)          config.sootioUrl          = normalizeSootioUrl(s.sootioUrl)
+  if (s.rdApiKey)           config.rdApiKey            = s.rdApiKey
+  if (s.tmdbApiKey)         config.tmdbApiKey          = s.tmdbApiKey
+  if (s.serverUrl)          config.serverUrl           = s.serverUrl
+  if (s.traktClientId)      config.traktClientId       = s.traktClientId
+  if (s.traktClientSecret)  config.traktClientSecret   = s.traktClientSecret
+  if (s.traktLists != null) config.traktLists          = parseTraktLists(s.traktLists)
+  if (s.streamProviderUrls != null) config.streamProviderUrls = parseStreamProviderUrls(s.streamProviderUrls)
+  if (s.englishStreamMode != null) config.englishStreamMode = parseEnglishStreamMode(s.englishStreamMode)
+}
+
+// Wrap Fastify logger so UI log viewer captures it
+wrapFastifyLogger(app)
+
+// Register routes
+await app.register(jellyfinRoutes)
+await app.register(castRoutes)
+await app.register(uiRoutes)
+
+// Healthcheck
+app.get('/healthz', async () => ({ status: 'ok' }))
+
+// ── Play endpoint ─────────────────────────────────────────────────────────────
+// Called by Infuse when it follows the URL returned from PlaybackInfo.
+// Queries AIOStreams for the best RD-cached stream and 302s to the direct URL.
+
+function pad2(n: number) { return n.toString().padStart(2, '0') }
+
+const VIDEO_EXTS = new Set(['mkv','mp4','avi','mov','m4v','ts','m2ts','wmv','flv','webm'])
+
+function isVideoFile(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? ''
+  return VIDEO_EXTS.has(ext)
+}
+
+function isLikelyBadResolvedFilename(filename: string): boolean {
+  const lower = filename.toLowerCase()
+  const ext = lower.split('.').pop() ?? ''
+  if (/\bsample\b|\btrailer\b|\bextras?\b|\bfeaturette\b/.test(lower)) return true
+  if (ext === 'm2ts' || ext === 'ts') return true
+  if (/^\d{4,6}\.(m2ts|ts)$/.test(lower)) return true
+  return false
+}
+
+function streamMetadataText(stream: { name?: string; title?: string; behaviorHints?: Record<string, unknown> }): string {
+  const filename = typeof stream.behaviorHints?.filename === 'string' ? stream.behaviorHints.filename : ''
+  return `${stream.name ?? ''} ${stream.title ?? ''} ${filename}`.toLowerCase()
+}
+
+function streamClearlyEnglish(stream: { name?: string; title?: string; behaviorHints?: Record<string, unknown> }): boolean {
+  const text = streamMetadataText(stream)
+  const hasEnglish = /\boriginal\s*\(?eng\)?\b|\benglish\b|\beng\b|🇬🇧/.test(text)
+  const hasNonEnglish = /\bdubbing\s*pl\b|\bpolish\b|\bpolski\b|\blektor\b|🇵🇱|\btruefrench\b|\bfrench\b|🇫🇷/.test(text)
+  return hasEnglish && !hasNonEnglish
+}
+
+function streamClearlyNonEnglish(stream: { name?: string; title?: string; behaviorHints?: Record<string, unknown> }): boolean {
+  const text = streamMetadataText(stream)
+  const hasEnglish = /\boriginal\s*\(?eng\)?\b|\benglish\b|\beng\b|🇬🇧/.test(text)
+  const hasNonEnglish = /\bdubbing\s*pl\b|\bpolish\b|\bpolski\b|\blektor\b|🇵🇱|\btruefrench\b|\bfrench\b|🇫🇷/.test(text)
+  return hasNonEnglish && !hasEnglish
+}
+
+function shouldProbeEnglishAudio(stream: { name?: string; title?: string; behaviorHints?: Record<string, unknown> }): boolean {
+  if (config.englishStreamMode === 'off') return false
+  if (streamClearlyEnglish(stream)) return false
+  if (streamClearlyNonEnglish(stream)) return false
+  return true
+}
+
+function hasEnglishAudio(languages: string[]): boolean {
+  return languages.some(lang =>
+    /^(en|eng|english)$/.test(lang) || /\beng(lish)?\b/.test(lang),
+  )
+}
+
+function groupStreamsByProvider<T extends { providerOrder?: number }>(streams: T[]): T[][] {
+  const groups = new Map<number, T[]>()
+  for (const stream of streams) {
+    const key = stream.providerOrder ?? 999
+    const existing = groups.get(key)
+    if (existing) existing.push(stream)
+    else groups.set(key, [stream])
+  }
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, group]) => group)
+}
+
+async function resolveAndRedirect(
+  streams: Awaited<ReturnType<typeof fetchRankedStreams>>,
+  label: string,
+  reply: { redirect: (url: string, code: number) => unknown; code: (n: number) => { send: (v: unknown) => unknown } },
+  fileHint?: string,
+) {
+  if (config.rdApiKey) {
+    const providerGroups = groupStreamsByProvider(streams)
+    for (const group of providerGroups) {
+      const providerOrder = group[0]?.providerOrder ?? 999
+      app.log.info(`play: trying providerOrder=${providerOrder} for ${label} (${group.length} candidate${group.length === 1 ? '' : 's'})`)
+      for (const stream of group) {
+        const hash = extractHashFromStreamUrl(stream.url)
+        if (!hash) continue
+        try {
+          app.log.info(`play: trying hash ${hash.slice(0, 8)}… for ${label}`)
+          if (config.englishStreamMode === 'require' && streamClearlyNonEnglish(stream)) {
+            app.log.info(`play: skipping stream metadata for ${label}, clearly non-English`)
+            continue
+          }
+          const resolved = await resolveStream(hash, fileHint)
+          if (!isVideoFile(resolved.filename)) {
+            app.log.info(`play: skipping non-video file ${resolved.filename}, trying next`)
+            continue
+          }
+          if (isLikelyBadResolvedFilename(resolved.filename)) {
+            app.log.info(`play: skipping suspicious file ${resolved.filename}, trying next`)
+            continue
+          }
+          if (shouldProbeEnglishAudio(stream)) {
+            try {
+              const audioLanguages = await probeAudioLanguages(resolved.url)
+              app.log.info(`play: ffprobe audio languages for ${resolved.filename}: ${audioLanguages.join(', ') || 'none'}`)
+              if (config.englishStreamMode === 'require' && !hasEnglishAudio(audioLanguages)) {
+                app.log.info(`play: skipping ${resolved.filename}, no English audio detected`)
+                continue
+              }
+            } catch (err) {
+              app.log.warn(`play: ffprobe failed for ${resolved.filename}: ${err}`)
+            }
+          }
+          app.log.info(`play: RD resolved ${resolved.filename} → ${resolved.url.slice(0, 80)}…`)
+          return reply.redirect(resolved.url, 302)
+        } catch (err) {
+          if (err instanceof NotCachedError) {
+            app.log.info(`play: hash ${hash.slice(0, 8)}… not cached, trying next`)
+            continue
+          }
+          app.log.warn(`play: RD error for hash ${hash.slice(0, 8)}…: ${err}`)
+          break
+        }
+      }
+    }
+    app.log.warn(`play: no usable RD-cached stream found for ${label}`)
+    return reply.code(404).send({ error: 'No cached stream available', message: 'No Cached Streams Found' })
+  }
+  const best = streams[0]
+  if (!best?.url) {
+    return reply.code(404).send({ error: 'No usable stream available', message: 'No Streams Found' })
+  }
+  app.log.info(`play: fallback direct → ${best.url.slice(0, 80)}…`)
+  return reply.redirect(best.url, 302)
+}
+
+app.get('/play/:imdbId', async (req, reply) => {
+  const { imdbId } = req.params as { imdbId: string }
+  app.log.info(`play: resolving stream for ${imdbId}`)
+  try {
+    const streams = await fetchRankedStreams(imdbId)
+    return resolveAndRedirect(streams, imdbId, reply as never)
+  } catch (err) {
+    app.log.warn(`play: no stream for ${imdbId}: ${err}`)
+    return reply.code(404).send({ error: 'No stream available', message: 'No Streams Found' })
+  }
+})
+
+app.get('/play/:imdbId/:season/:episode', async (req, reply) => {
+  const { imdbId, season, episode } = req.params as { imdbId: string; season: string; episode: string }
+  const s = parseInt(season)
+  const e = parseInt(episode)
+  app.log.info(`play: resolving episode stream for ${imdbId} S${s}E${e}`)
+  try {
+    const streams = await fetchRankedEpisodeStreams(imdbId, s, e)
+    return resolveAndRedirect(streams, `${imdbId} S${s}E${e}`, reply as never, `s${pad2(s)}e${pad2(e)}`)
+  } catch (err) {
+    app.log.warn(`play: no stream for ${imdbId} S${s}E${e}: ${err}`)
+    return reply.code(404).send({ error: 'No stream available', message: 'No Streams Found' })
+  }
+})
+
+// ── Trakt auth ────────────────────────────────────────────────────────────────
+
+// GET /trakt/auth — check auth status
+app.get('/trakt/auth', async () => tokenStatus())
+
+// POST /trakt/auth — start device flow
+// Returns the code + URL to visit. Polls in background; token saved when approved.
+app.post('/trakt/auth', async (req, reply) => {
+  try {
+    const { instructions, approved } = await startDeviceAuth()
+    app.log.info(`trakt: device auth started — visit ${instructions.verificationUrl} and enter code: ${instructions.userCode}`)
+    // Background: save token when user approves
+    approved
+      .then(async () => {
+        app.log.info('trakt: OAuth approved, starting watchlist sync')
+        await runSync()
+      })
+      .catch(err => app.log.error(`trakt: device auth failed: ${err}`))
+    return {
+      message:         `Visit ${instructions.verificationUrl} and enter this code`,
+      code:            instructions.userCode,
+      verificationUrl: instructions.verificationUrl,
+      expiresInSecs:   instructions.expiresIn,
+    }
+  } catch (err) {
+    return reply.code(500).send({ error: String(err) })
+  }
+})
+
+// ── Manual sync ───────────────────────────────────────────────────────────────
+// POST /sync  — re-fetch Trakt watchlist and update the DB in the background.
+
+app.post('/sync', async () => {
+  runSync().catch(err => app.log.error(`Manual sync failed: ${err}`))
+  return { status: 'sync started' }
+})
+
+let currentSync: Promise<void> | null = null
+
+// Sync on startup, then every 60 minutes
+async function runSyncInternal() {
+  await syncTraktWatchlist()
+  await syncTraktShowsWatchlist()
+  for (const slug of config.traktLists) {
+    await syncTraktList(slug).catch(err => app.log.error(`List sync "${slug}" failed: ${err}`))
+  }
+  const staleListCleanup = cleanupRemovedTraktListSources(config.traktLists)
+  if (staleListCleanup.removedSourceKeys.length) {
+    app.log.warn(
+      `sync: removed stale Trakt list sources — ${staleListCleanup.removedSourceKeys.join(', ')}; ` +
+      `${staleListCleanup.prunedMovies} movies pruned, ${staleListCleanup.prunedShows} shows pruned`
+    )
+  }
+
+  // Refresh metadata (e.g. backdrop_path) for movies missing it
+  const movies = listMovies({ limit: 100_000 })
+  for (const movie of movies) {
+    await refreshMovieMetadataIfNeeded(movie).catch(() => {})
+  }
+
+  // Also refresh metadata (e.g. backdrop_path) for shows missing it
+  const shows = listShows({ limit: 100_000 })
+  for (const show of shows) {
+    await refreshShowMetadataIfNeeded(show).catch(() => {})
+    await ensureShowSeasonsCached(show).catch(err =>
+      app.log.warn(`Season fetch failed for "${show.title}": ${err}`)
+    )
+  }
+
+  const latestSeasonSubs = listLatestSeasonShowSubscriptions()
+  for (const sub of latestSeasonSubs) {
+    const latestSeasonNumber = getLatestSeasonNumberForShow(sub.showTmdbId)
+    if (latestSeasonNumber && latestSeasonNumber !== sub.activeSeasonNumber) {
+      upsertManualShowSubscription(sub.showTmdbId, 'latest', latestSeasonNumber)
+    }
+  }
+
+  const prunedMovies = pruneAllOrphanedMovies()
+  const prunedShows = pruneAllOrphanedShows()
+  if (prunedMovies || prunedShows) {
+    app.log.warn(`sync: pruned orphaned rows — ${prunedMovies} movies, ${prunedShows} shows`)
+  }
+
+  markSyncComplete()
+}
+
+function runSync(): Promise<void> {
+  if (currentSync) {
+    app.log.info('sync: already in progress, reusing existing run')
+    return currentSync
+  }
+  currentSync = runSyncInternal()
+    .catch(err => {
+      app.log.error(`Sync failed: ${err}`)
+      throw err
+    })
+    .finally(() => {
+      currentSync = null
+    })
+  return currentSync
+}
+
+runSync().catch(err => app.log.error(`Startup sync failed: ${err}`))
+setInterval(
+  () => runSync().catch(err => app.log.error(`Scheduled sync failed: ${err}`)),
+  60 * 60 * 1000,
+)
+
+await app.listen({ port: config.port, host: config.host })

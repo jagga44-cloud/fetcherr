@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fetcherr · Logs</title>
+  <link rel="icon" type="image/svg+xml" href="/ui/static/fetcherr.svg">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #12151d; --surface-raised: #181c26;
+      --border: rgba(255,255,255,.07); --border-strong: rgba(255,255,255,.12);
+      --text: #eef2ff; --muted: #8892a4;
+      --accent: #9d6ef0; --accent-dim: rgba(157,110,240,.15); --accent-border: rgba(157,110,240,.35);
+      --green: #4ade80; --green-dim: rgba(74,222,128,.12); --green-border: rgba(74,222,128,.3);
+      --amber: #fbbf24; --amber-dim: rgba(251,191,36,.1);   --amber-border: rgba(251,191,36,.28);
+      --red: #f87171;   --red-dim: rgba(248,113,113,.1);    --red-border: rgba(248,113,113,.28);
+      --blue: #60a5fa;  --blue-dim: rgba(96,165,250,.1);    --blue-border: rgba(96,165,250,.28);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+    .shell { max-width: 1100px; margin: 0 auto; padding: 20px 20px 60px; }
+
+    /* ── Topbar ─────────────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 14px; border-radius: 16px;
+      border: 1px solid var(--border); background: var(--surface); margin-bottom: 28px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text);
+    }
+    .brand img { width: 30px; height: 30px; border-radius: 7px; }
+    .brand-name { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+    .brand-tag  { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer;
+      text-decoration: none; transition: color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--surface-raised); }
+
+    /* ── Page header ─────────────────────────────────────── */
+    .page-header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .page-title { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.02em; }
+    .page-sub   { font-size: 13px; color: var(--muted); margin: 0; }
+
+    /* ── Toolbar ─────────────────────────────────────────── */
+    .toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+    }
+
+    /* ── Tabs ────────────────────────────────────────────── */
+    .tabs {
+      display: inline-flex; gap: 2px; padding: 3px;
+      border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
+    }
+    .tab {
+      padding: 7px 14px; border-radius: 9px; border: none; background: transparent;
+      color: var(--muted); font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: background .15s, color .15s; font-family: inherit;
+    }
+    .tab.active           { background: var(--surface-raised); color: var(--text); }
+    .tab.info.active      { color: var(--blue); }
+    .tab.warn.active      { color: var(--amber); }
+    .tab.error.active     { color: var(--red); }
+
+    /* ── Auto-refresh indicator ──────────────────────────── */
+    .refresh-status {
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .refresh-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green); opacity: 0; transition: opacity .3s;
+    }
+    .refresh-dot.flash { opacity: 1; }
+
+    /* ── Log list ─────────────────────────────────────────── */
+    .log-list { display: grid; gap: 2px; }
+    .log-entry {
+      display: grid;
+      grid-template-columns: 160px 52px 1fr;
+      gap: 10px; align-items: baseline;
+      padding: 7px 12px; border-radius: 8px;
+      font-size: 13px; font-family: ui-monospace, "Cascadia Code", "Fira Code", monospace;
+      border: 1px solid transparent; transition: background .1s;
+    }
+    .log-entry:hover  { background: var(--surface); border-color: var(--border); }
+    .log-entry.error  { background: var(--red-dim);   border-color: var(--red-border); }
+    .log-entry.error:hover  { background: rgba(248,113,113,.15); }
+    .log-entry.warn   { background: var(--amber-dim); border-color: var(--amber-border); }
+    .log-entry.warn:hover   { background: rgba(251,191,36,.15); }
+    .log-time  { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .log-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 2px 6px; border-radius: 5px;
+      font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .log-badge.info  { background: var(--blue-dim);   color: var(--blue);  border: 1px solid var(--blue-border); }
+    .log-badge.warn  { background: var(--amber-dim);  color: var(--amber); border: 1px solid var(--amber-border); }
+    .log-badge.error { background: var(--red-dim);    color: var(--red);   border: 1px solid var(--red-border); }
+    .log-msg   { color: var(--text); word-break: break-word; line-height: 1.5; }
+    .log-entry.error .log-msg { color: #fca5a5; }
+    .log-entry.warn  .log-msg { color: #fde68a; }
+
+    /* ── Empty state ─────────────────────────────────────── */
+    .empty {
+      padding: 40px 20px; text-align: center; color: var(--muted);
+      font-size: 14px; border: 1px dashed var(--border); border-radius: 16px;
+    }
+
+    @media (max-width: 600px) {
+      .log-entry { grid-template-columns: 1fr; gap: 4px; }
+      .log-time  { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <nav class="topbar">
+    <a href="/ui/dashboard" class="brand">
+      <img src="/ui/static/fetcherr.svg" alt="Fetcherr" style="width:30px;height:30px;">
+      <div class="brand-name">Fetcherr</div>
+    </a>
+    <div class="topbar-right">
+      <a class="icon-btn" href="/ui/setup" title="Setup">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </a>
+      <a class="icon-btn" href="/ui/dashboard" title="Dashboard">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+      </a>
+      <button class="icon-btn" id="logoutBtn" title="Sign out" style="display:none" onclick="doLogout()">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Logs</h1>
+      <p class="page-sub">Recent application activity. Shows the newest 1000 entries.</p>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab active" id="tabAll"   onclick="setLevel('all')">All</button>
+      <button class="tab info"   id="tabInfo"  onclick="setLevel('info')">Info</button>
+      <button class="tab warn"   id="tabWarn"  onclick="setLevel('warn')">Warnings</button>
+      <button class="tab error"  id="tabError" onclick="setLevel('error')">Errors</button>
+    </div>
+    <div class="refresh-status">
+      <span class="refresh-dot" id="refreshDot"></span>
+      <span>Auto-refreshing every 5s</span>
+    </div>
+  </div>
+
+  <div class="log-list" id="logList"></div>
+</div>
+
+<script>
+  let activeLevel = 'all'
+
+  function setLevel(level) {
+    activeLevel = level
+    ;['all','info','warn','error'].forEach(l => {
+      const tab = document.getElementById('tab' + l.charAt(0).toUpperCase() + l.slice(1))
+      if (tab) tab.classList.toggle('active', l === level)
+    })
+    loadLogs()
+  }
+
+  function esc(v) {
+    return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  }
+
+  function formatTime(iso) {
+    const d = new Date(iso)
+    if (isNaN(d)) return iso
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      + ' ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  }
+
+  async function loadLogs() {
+    const res = await fetch(`/ui/logs-data?level=${activeLevel}`)
+    if (res.status === 401) { window.location.href = '/ui/login'; return }
+    if (!res.ok) return
+    const d = await res.json()
+    const entries = d.entries || []
+
+    const dot = document.getElementById('refreshDot')
+    dot.classList.add('flash')
+    setTimeout(() => dot.classList.remove('flash'), 400)
+
+    const list = document.getElementById('logList')
+    if (!entries.length) {
+      list.innerHTML = '<div class="empty">No log entries yet.</div>'
+      return
+    }
+
+    list.innerHTML = entries.map(e => `
+      <div class="log-entry ${esc(e.level)}">
+        <span class="log-time">${esc(formatTime(e.time))}</span>
+        <span class="log-badge ${esc(e.level)}">${esc(e.level)}</span>
+        <span class="log-msg">${esc(e.msg)}</span>
+      </div>`).join('')
+  }
+
+  async function doLogout() {
+    await fetch('/ui/auth/logout', { method: 'POST' })
+    window.location.href = '/ui/login'
+  }
+
+  async function checkAuth() {
+    const res = await fetch('/ui/auth/check')
+    if (res.ok) {
+      const d = await res.json()
+      if (d.authEnabled) document.getElementById('logoutBtn').style.display = ''
+    }
+  }
+
+  checkAuth()
+  loadLogs()
+  setInterval(loadLogs, 5000)
+</script>
+</body>
+</html>

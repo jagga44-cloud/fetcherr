@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Fetcherr</title>
+  <link rel="icon" type="image/svg+xml" href="/ui/static/fetcherr.svg">
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --surface: #12151d;
+      --surface-raised: #181c26;
+      --border: rgba(255,255,255,.07);
+      --border-strong: rgba(255,255,255,.12);
+      --text: #eef2ff;
+      --muted: #8892a4;
+      --accent: #9d6ef0;
+      --accent-dim: rgba(157,110,240,.15);
+      --accent-border: rgba(157,110,240,.35);
+      --green: #4ade80;
+      --green-dim: rgba(74,222,128,.12);
+      --green-border: rgba(74,222,128,.3);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251,191,36,.1);
+      --amber-border: rgba(251,191,36,.28);
+      --red: #f87171;
+      --red-dim: rgba(248,113,113,.1);
+      --red-border: rgba(248,113,113,.28);
+      --blue: #60a5fa;
+      --blue-dim: rgba(96,165,250,.1);
+      --blue-border: rgba(96,165,250,.28);
+      --slate-dim: rgba(148,163,184,.08);
+      --slate-border: rgba(148,163,184,.2);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 20px 20px 80px; }
+
+    /* Topbar */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 10px 14px; border-radius: 16px;
+      border: 1px solid var(--border); background: var(--surface); margin-bottom: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); }
+    .brand-icon {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: var(--accent-dim); border: 1px solid var(--accent-border);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .brand-icon svg { width: 16px; height: 16px; color: #c4b5fd; }
+    .brand-name { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+    .brand-tag { font-size: 11px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+    .topbar-right { display: flex; gap: 8px; align-items: center; }
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer;
+      text-decoration: none; transition: color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); background: var(--surface-raised); }
+
+    /* Page header */
+    .page-header {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .page-title { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.02em; }
+    .page-sub { font-size: 13px; color: var(--muted); margin: 0; }
+    .header-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px;
+      border-radius: 10px; border: 1px solid var(--border); background: var(--surface-raised);
+      color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer;
+      text-decoration: none; transition: background .15s, border-color .15s; white-space: nowrap;
+      font-family: inherit;
+    }
+    .btn:hover { background: rgba(255,255,255,.06); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary { background: var(--accent-dim); border-color: var(--accent-border); color: #d6b8ff; }
+    .btn.primary:hover { background: rgba(157,110,240,.22); }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px,1fr)); gap: 10px; margin-bottom: 16px; }
+    .stat {
+      padding: 14px 16px; border-radius: 14px; border: 1px solid var(--border);
+      background: var(--surface); cursor: default;
+    }
+    .stat.filterable { cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+    .stat.filterable:hover { background: var(--surface-raised); border-color: var(--border-strong); transform: translateY(-1px); }
+    .stat.active { background: var(--surface-raised); border-color: var(--border-strong); box-shadow: inset 0 0 0 1px rgba(255,255,255,.04); }
+    .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -.02em; line-height: 1; margin-bottom: 5px; }
+    .stat-label { font-size: 12px; color: var(--muted); }
+    .stat.movies   .stat-value { color: var(--green); }
+    .stat.shows    .stat-value { color: var(--accent); }
+
+    /* Sync bar */
+    .sync-bar {
+      display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: var(--muted);
+      margin-bottom: 18px; padding: 10px 14px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface);
+    }
+    .sync-bar span { white-space: nowrap; }
+    .sync-bar strong { color: var(--text); font-weight: 500; }
+
+    /* Controls */
+    .controls { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .controls input, .controls select {
+      padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); font-size: 13px;
+      font-family: inherit; outline: none; transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .controls input { flex: 1; min-width: 160px; }
+    .controls select { flex-shrink: 0; cursor: pointer; }
+    .controls input {
+      border-color: rgba(157,110,240,.2);
+      background:
+        linear-gradient(180deg, rgba(157,110,240,.07), rgba(157,110,240,.03)),
+        var(--surface);
+    }
+    .controls input:focus, .controls select:focus {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 3px rgba(157,110,240,.12);
+    }
+    .controls select option { background: #1e2230; }
+
+    /* Items */
+    .items { display: flex; flex-direction: column; gap: 6px; }
+    .item {
+      display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border-radius: 12px; border: 1px solid var(--border); background: var(--surface);
+      transition: border-color .15s, background .15s; cursor: default;
+    }
+    .item:hover { background: var(--surface-raised); border-color: var(--border-strong); }
+    .item-poster {
+      width: 36px; height: 54px; border-radius: 6px; object-fit: cover;
+      background: var(--surface-raised); flex-shrink: 0; border: 1px solid var(--border);
+    }
+    .item-poster-placeholder {
+      width: 36px; height: 54px; border-radius: 6px; background: var(--surface-raised);
+      border: 1px solid var(--border); flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center; font-size: 18px;
+    }
+    .item-body { flex: 1; min-width: 0; }
+    .item-title {
+      font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; margin-bottom: 3px;
+    }
+    .item-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .item-year { font-size: 12px; color: var(--muted); }
+    .pill {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+      border-radius: 5px; font-size: 11px; font-weight: 500; border: 1px solid var(--border);
+      color: var(--muted); background: transparent; white-space: nowrap;
+    }
+    .pill.green  { border-color: var(--green-border);  background: var(--green-dim);  color: #bbf7d0; }
+    .pill.accent { border-color: var(--accent-border); background: var(--accent-dim); color: #d6b8ff; }
+    .pill.blue   { border-color: var(--blue-border);   background: var(--blue-dim);   color: #bfdbfe; }
+    .pill.amber  { border-color: var(--amber-border);  background: var(--amber-dim);  color: #fef3c7; }
+    .item-link { font-size: 11px; color: var(--muted); text-decoration: none; }
+    .item-link:hover { color: var(--text); }
+    .item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 14px; }
+
+    /* Sync feedback */
+    .sync-msg {
+      margin-bottom: 14px; padding: 10px 14px; border-radius: 10px; font-size: 13px;
+      border: 1px solid var(--green-border); background: var(--green-dim); color: #bbf7d0;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .page-header { flex-direction: column; align-items: flex-start; }
+      .stats { grid-template-columns: repeat(2,1fr); }
+    }
+
+    /* Search modal */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(4px);
+      display: none; align-items: flex-start; justify-content: center;
+      padding: 60px 20px 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      width: 100%; max-width: 560px; max-height: calc(100vh - 100px);
+      display: flex; flex-direction: column;
+      background: var(--surface); border: 1px solid var(--border-strong);
+      border-radius: 20px; overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,.5);
+    }
+    .modal-head {
+      padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
+    }
+    .modal-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modal-title { font-size: 16px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+    .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; padding: 4px; display: flex; border-radius: 6px; transition: color .15s, background .15s; }
+    .modal-close:hover { color: var(--text); background: var(--surface-raised); }
+    .modal-search-row { display: flex; gap: 8px; }
+    .modal-search-row input {
+      flex: 1; padding: 9px 12px; border-radius: 10px;
+      border: 1px solid rgba(157,110,240,.24);
+      background:
+        linear-gradient(180deg, rgba(157,110,240,.08), rgba(157,110,240,.03)),
+        var(--surface-raised);
+      color: var(--text); font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+    }
+    .modal-search-row input:focus {
+      border-color: var(--accent-border);
+      box-shadow: 0 0 0 3px rgba(157,110,240,.12);
+      background:
+        linear-gradient(180deg, rgba(157,110,240,.12), rgba(157,110,240,.05)),
+        var(--surface-raised);
+    }
+    .fab { position: fixed; bottom: 28px; right: 28px; width: 52px; height: 52px; border-radius: 50%; background: var(--accent); border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(157,110,240,.45); transition: transform .15s, box-shadow .15s; z-index: 100; }
+    .fab:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(157,110,240,.6); }
+    .modal-body { overflow-y: auto; padding: 12px; flex: 1; }
+    .search-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+    .search-result {
+      display: flex; align-items: center; gap: 12px; padding: 10px 10px;
+      border-radius: 12px; border: 1px solid transparent;
+      transition: background .12s, border-color .12s;
+    }
+    .search-result:hover { background: var(--surface-raised); border-color: var(--border); }
+    .result-poster { width: 36px; height: 54px; border-radius: 6px; object-fit: cover; background: var(--surface-raised); border: 1px solid var(--border); flex-shrink: 0; }
+    .result-poster-ph { width: 36px; height: 54px; border-radius: 6px; background: var(--surface-raised); border: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .result-body { flex: 1; min-width: 0; }
+    .result-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+    .result-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+    .result-actions { flex-shrink: 0; position: relative; }
+    .result-action-stack { display: flex; align-items: center; justify-content: flex-end; }
+    .btn-add { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--accent-border); background: var(--accent-dim); color: #d6b8ff; font-size: 13px; font-family: inherit; font-weight: 500; cursor: pointer; transition: background .15s; white-space: nowrap; }
+    .btn-add:hover { background: rgba(157,110,240,.22); }
+    .btn-add:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-add.secondary { border-color: var(--border); background: var(--surface-raised); color: var(--text); }
+    .btn-add.secondary:hover { background: rgba(255,255,255,.06); }
+    .btn-add.icon {
+      width: 34px; height: 34px; padding: 0; border-radius: 10px;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .tv-add-menu {
+      position: absolute; right: 0; top: calc(100% + 8px); z-index: 10;
+      min-width: 152px; padding: 6px; border-radius: 12px;
+      border: 1px solid var(--border-strong); background: var(--surface);
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      display: none; flex-direction: column; gap: 6px;
+    }
+    .tv-add-menu.open { display: flex; }
+    .btn-remove { width: 30px; height: 30px; padding: 0; border-radius: 8px; border: 1px solid var(--red-border); background: var(--red-dim); color: #fecaca; display: inline-flex; align-items: center; justify-content: center; font-size: 0; font-family: inherit; cursor: pointer; transition: background .15s, transform .15s; }
+    .btn-remove:hover { background: rgba(248,113,113,.18); transform: translateY(-1px); }
+    .btn-remove:disabled { opacity: .5; cursor: not-allowed; }
+    .badge-in-lib { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--green-border); background: var(--green-dim); color: #bbf7d0; font-size: 12px; font-weight: 500; white-space: nowrap; }
+    .modal-toast { margin: 0 12px 12px; padding: 10px 14px; border-radius: 10px; font-size: 13px; display: none; }
+    .modal-toast.success { border: 1px solid var(--green-border); background: var(--green-dim); color: #bbf7d0; }
+    .modal-toast.error { border: 1px solid var(--red-border); background: var(--red-dim); color: #fecaca; }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <nav class="topbar">
+    <a href="/ui/dashboard" class="brand">
+      <div class="brand-icon">
+        <img src="/ui/static/fetcherr.svg" alt="Fetcherr" style="width:24px;height:24px;">
+      </div>
+      <div class="brand-name">Fetcherr</div>
+    </a>
+    <div class="topbar-right">
+      <a class="icon-btn" href="/ui/logs" title="Logs">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </a>
+      <a class="icon-btn" href="/ui/settings" title="Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </a>
+      <button class="icon-btn" id="logoutBtn" title="Sign out" style="display:none" onclick="doLogout()">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Library</h1>
+      <p class="page-sub">Browse synced movies and shows, review status, and manage the library.</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn primary" id="syncBtn" onclick="triggerSync()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Sync Trakt
+      </button>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat movies filterable" id="statCardMovies" onclick="switchTab('movies')">
+      <div class="stat-value" id="statMovies">—</div>
+      <div class="stat-label">Movies</div>
+    </div>
+    <div class="stat shows filterable" id="statCardShows" onclick="switchTab('shows')">
+      <div class="stat-value" id="statShows">—</div>
+      <div class="stat-label">TV Shows</div>
+    </div>
+  </div>
+
+  <div class="sync-bar">
+    <span>Last sync: <strong id="lastSync">—</strong></span>
+    <span>Next sync: <strong id="nextSync">—</strong></span>
+  </div>
+
+  <div id="syncMsg" class="sync-msg">Sync started — library will update in a moment.</div>
+
+  <div class="controls">
+    <input type="text" id="searchInput" placeholder="Search…" oninput="onSearch()">
+    <select id="sortSelect" onchange="loadItems()">
+      <option value="popularity:DESC">Most popular</option>
+      <option value="title:ASC">Title A→Z</option>
+      <option value="title:DESC">Title Z→A</option>
+      <option value="year:DESC">Newest first</option>
+      <option value="year:ASC">Oldest first</option>
+    </select>
+  </div>
+
+  <div class="items" id="itemsList"></div>
+</div>
+
+<button class="fab" onclick="openSearch()" title="Add to Library">
+  <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+</button>
+
+<!-- Add to Library modal -->
+<div class="modal-overlay" id="searchModal" onclick="closeOnOverlay(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-row">
+        <h2 class="modal-title">Add to Library</h2>
+        <button class="modal-close" onclick="closeSearch()">
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-search-row">
+        <input id="searchQuery" type="text" placeholder="Search movies or TV shows…" oninput="onModalSearch()" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-toast" id="modalToast"></div>
+    <div class="modal-body" id="searchResults">
+      <div class="search-empty">Search for a title to add it to your library.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentTab = 'all'
+  let searchTimer = null
+  let openTvMenuTmdbId = null
+
+  function fmtRelTime(iso) {
+    if (!iso) return '—'
+    const diff = new Date(iso) - Date.now()
+    const abs  = Math.abs(diff)
+    const mins = Math.round(abs / 60000)
+    const hrs  = Math.round(abs / 3600000)
+    if (diff < 0) {
+      if (mins < 60) return `${mins}m ago`
+      return `${hrs}h ago`
+    }
+    if (mins < 60) return `in ${mins}m`
+    return `in ${hrs}h`
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  async function loadStats() {
+    const res = await fetch('/ui/stats')
+    if (!res.ok) return
+    const d = await res.json()
+    document.getElementById('statMovies').textContent = d.movies
+    document.getElementById('statShows').textContent  = d.shows
+    document.getElementById('lastSync').textContent   = d.lastSyncAt ? fmtDate(d.lastSyncAt) : '—'
+    document.getElementById('nextSync').textContent   = d.nextSyncAt ? fmtRelTime(d.nextSyncAt) : '—'
+  }
+
+  function getSort() {
+    const [sortBy, sortOrder] = document.getElementById('sortSelect').value.split(':')
+    return { sortBy, sortOrder }
+  }
+
+  async function loadItems() {
+    const search = document.getElementById('searchInput').value.trim()
+    const { sortBy, sortOrder } = getSort()
+    const qs = `search=${encodeURIComponent(search)}&sortBy=${sortBy}&sortOrder=${sortOrder}&limit=200`
+
+    if (currentTab === 'all') {
+      const [rm, rs] = await Promise.all([
+        fetch(`/ui/movies?${qs}`).then(r => r.ok ? r.json() : { items: [] }),
+        fetch(`/ui/shows?${qs}`).then(r => r.ok ? r.json() : { items: [] }),
+      ])
+      const movies = rm.items.map(m => ({ ...m, _type: 'movies' }))
+      const shows  = rs.items.map(s => ({ ...s, _type: 'shows' }))
+      const merged = [...movies, ...shows].sort((a, b) => {
+        if (sortBy === 'title') return sortOrder === 'ASC'
+          ? a.title.localeCompare(b.title)
+          : b.title.localeCompare(a.title)
+        if (sortBy === 'year') return sortOrder === 'ASC' ? a.year - b.year : b.year - a.year
+        return sortOrder === 'ASC' ? a.popularity - b.popularity : b.popularity - a.popularity
+      })
+      renderItems(merged, 'all')
+      return
+    }
+
+    const url = currentTab === 'movies'
+      ? `/ui/movies?${qs}`
+      : `/ui/shows?${qs}`
+    const res = await fetch(url)
+    if (!res.ok) return
+    const d = await res.json()
+    renderItems(d.items, currentTab)
+  }
+
+  function renderItems(items, tab) {
+    const el = document.getElementById('itemsList')
+    if (!items.length) {
+      el.innerHTML = '<div class="empty">No items found.</div>'
+      return
+    }
+    el.innerHTML = items.map(item => {
+      const itemType = item._type || tab  // 'movies' or 'shows'
+      const isShow   = itemType === 'shows'
+      const emoji    = isShow ? '📺' : '🎬'
+      const poster   = item.posterUrl
+        ? `<img class="item-poster" src="${item.posterUrl}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+        + `<div class="item-poster-placeholder" style="display:none">${emoji}</div>`
+        : `<div class="item-poster-placeholder">${emoji}</div>`
+
+      const imdbLink = item.imdbId
+        ? `<a class="item-link" href="https://www.imdb.com/title/${item.imdbId}" target="_blank">IMDb ↗</a>`
+        : ''
+      const removeBtn = item.manualAdded
+        ? `<button class="btn-remove" title="Remove manual item" aria-label="Remove manual item" onclick="removeItem(${item.tmdbId}, '${isShow ? 'tv' : 'movie'}', this)"><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>`
+        : ''
+
+      let metaRight = ''
+      if (tab === 'all') {
+        const typePill = `<span class="pill ${isShow ? 'accent' : 'blue'}">${isShow ? 'TV Show' : 'Movie'}</span>`
+        if (isShow) {
+          const seasons = item.numSeasons
+            ? `<span class="pill">${item.numSeasons} season${item.numSeasons !== 1 ? 's' : ''}</span>` : ''
+          metaRight = typePill + seasons
+        } else {
+          const runtime = item.runtimeMins ? `<span class="pill">${item.runtimeMins}m</span>` : ''
+          metaRight = typePill + runtime
+        }
+      } else if (!isShow) {
+        const genres  = (item.genres || []).slice(0, 2).map(g => `<span class="pill">${g}</span>`).join('')
+        const runtime = item.runtimeMins ? `<span class="pill">${item.runtimeMins}m</span>` : ''
+        metaRight = genres + runtime
+      } else {
+        const statusColor = item.status === 'Ended' || item.status === 'Canceled' ? '' : 'green'
+        const statusPill  = item.status ? `<span class="pill ${statusColor}">${item.status}</span>` : ''
+        const seasons     = item.numSeasons
+          ? `<span class="pill blue">${item.numSeasons} season${item.numSeasons !== 1 ? 's' : ''}</span>` : ''
+        const manualMode = item.manualMode
+          ? `<span class="pill amber">${item.manualMode === 'latest' ? 'Latest season' : 'Whole series'}</span>`
+          : ''
+        metaRight = statusPill + seasons + manualMode
+      }
+
+      return `<div class="item">
+        ${poster}
+        <div class="item-body">
+          <div class="item-title">${item.title}</div>
+          <div class="item-meta">
+            <span class="item-year">${item.year || ''}</span>
+            ${metaRight}
+            ${imdbLink}
+          </div>
+        </div>
+        <div class="item-actions">${removeBtn}</div>
+      </div>`
+    }).join('')
+  }
+
+  function switchTab(tab) {
+    currentTab = currentTab === tab ? 'all' : tab
+    document.getElementById('statCardMovies').classList.toggle('active', currentTab === 'movies')
+    document.getElementById('statCardShows').classList.toggle('active', currentTab === 'shows')
+    loadItems()
+  }
+
+  function onSearch() {
+    clearTimeout(searchTimer)
+    searchTimer = setTimeout(loadItems, 250)
+  }
+
+  async function triggerSync() {
+    const btn = document.getElementById('syncBtn')
+    btn.disabled = true
+    btn.textContent = 'Syncing…'
+    try {
+      await fetch('/sync', { method: 'POST' })
+      const msg = document.getElementById('syncMsg')
+      msg.style.display = 'block'
+      setTimeout(() => { msg.style.display = 'none' }, 5000)
+    } finally {
+      btn.disabled = false
+      btn.innerHTML = `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Sync Trakt`
+    }
+  }
+
+  function showSyncMsg(text) {
+    const msg = document.getElementById('syncMsg')
+    msg.textContent = text
+    msg.style.display = 'block'
+    setTimeout(() => { msg.style.display = 'none' }, 5000)
+  }
+
+  async function removeItem(tmdbId, type, btn) {
+    btn.disabled = true
+    const icon = btn.innerHTML
+    btn.innerHTML = '…'
+    const res = await fetch('/ui/library/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tmdbId, type }),
+    })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      btn.disabled = false
+      btn.innerHTML = icon
+      showSyncMsg(d.error || 'Failed to remove item from library.')
+      return
+    }
+
+    if (d.removedFromLibrary) {
+      showSyncMsg('Removed from library.')
+    } else if (d.removedManual && d.stillPresent) {
+      showSyncMsg('Removed manual library entry. Item remains via another source.')
+    } else if (!d.removedManual) {
+      showSyncMsg('Item is not manually added.')
+    } else {
+      showSyncMsg('Updated library sources.')
+    }
+
+    await Promise.all([loadStats(), loadItems()])
+  }
+
+  async function doLogout() {
+    await fetch('/ui/auth/logout', { method: 'POST' })
+    window.location.href = '/ui/login'
+  }
+
+  async function checkAuth() {
+    const res = await fetch('/ui/auth/check')
+    if (res.status === 401) { window.location.href = '/ui/login'; return }
+    if (res.ok) {
+      const d = await res.json()
+      if (d.authEnabled) document.getElementById('logoutBtn').style.display = ''
+    }
+  }
+
+  loadStats()
+  loadItems()
+  checkAuth()
+  setInterval(loadStats, 60000)
+
+  // ── Search modal ────────────────────────────────────────────────────────────
+  let searchTimer2 = null
+  const inLibrarySet = new Set()
+
+  function openSearch() {
+    document.getElementById('searchModal').classList.add('open')
+    document.getElementById('searchQuery').focus()
+    document.addEventListener('keydown', onModalKey)
+  }
+
+  function closeSearch() {
+    document.getElementById('searchModal').classList.remove('open')
+    document.removeEventListener('keydown', onModalKey)
+    openTvMenuTmdbId = null
+  }
+
+  function closeOnOverlay(e) {
+    if (e.target === document.getElementById('searchModal')) closeSearch()
+  }
+
+  function onModalKey(e) { if (e.key === 'Escape') closeSearch() }
+
+  function onModalSearch() {
+    clearTimeout(searchTimer2)
+    searchTimer2 = setTimeout(runSearch, 350)
+  }
+
+  async function runSearch() {
+    const q  = document.getElementById('searchQuery').value.trim()
+    const el = document.getElementById('searchResults')
+    if (q.length < 2) {
+      el.innerHTML = '<div class="search-empty">Search for a title to add it to your library.</div>'
+      return
+    }
+    el.innerHTML = '<div class="search-empty">Searching…</div>'
+    const qs = encodeURIComponent(q)
+    const [rm, rt] = await Promise.all([
+      fetch(`/ui/search?q=${qs}&type=movie`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+      fetch(`/ui/search?q=${qs}&type=tv`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+    ])
+    // Interleave movie and TV results so both types surface early
+    const movies = rm.results ?? [], tv = rt.results ?? []
+    const results = []
+    for (let i = 0; i < Math.max(movies.length, tv.length); i++) {
+      if (i < movies.length) results.push(movies[i])
+      if (i < tv.length) results.push(tv[i])
+    }
+    if (!results.length) {
+      el.innerHTML = '<div class="search-empty">No results found.</div>'
+      return
+    }
+    el.innerHTML = results.map(r => {
+      const poster = r.poster
+        ? `<img class="result-poster" src="${r.poster}" alt="" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">`
+          + `<div class="result-poster-ph" style="display:none">${r.type === 'tv' ? '📺' : '🎬'}</div>`
+        : `<div class="result-poster-ph">${r.type === 'tv' ? '📺' : '🎬'}</div>`
+      const action = r.inLibrary || inLibrarySet.has(r.tmdbId)
+        ? `<span class="badge-in-lib">In Library</span>`
+        : r.type === 'tv'
+          ? `<div class="result-action-stack">
+              <button class="btn-add icon" title="Add TV show" aria-label="Add TV show" onclick="toggleTvAddMenu(${r.tmdbId}, event)">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+              <div class="tv-add-menu ${openTvMenuTmdbId === r.tmdbId ? 'open' : ''}" id="tvAddMenu-${r.tmdbId}" onclick="event.stopPropagation()">
+                <button class="btn-add" onclick="addItem(${r.tmdbId},'${r.type}','all',this)">Entire Series</button>
+                <button class="btn-add secondary" onclick="addItem(${r.tmdbId},'${r.type}','latest',this)">Latest Season</button>
+              </div>
+            </div>`
+          : `<button class="btn-add icon" title="Add movie" aria-label="Add movie" onclick="addItem(${r.tmdbId},'${r.type}','all',this)">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>`
+      return `<div class="search-result">
+        ${poster}
+        <div class="result-body">
+          <div class="result-title">${r.title}</div>
+          <div class="result-meta">
+            <span>${r.year || '—'}</span>
+            <span class="pill">${r.type === 'tv' ? 'TV Show' : 'Movie'}</span>
+          </div>
+        </div>
+        <div class="result-actions">${action}</div>
+      </div>`
+    }).join('')
+  }
+
+  function toggleTvAddMenu(tmdbId, event) {
+    event.stopPropagation()
+    openTvMenuTmdbId = openTvMenuTmdbId === tmdbId ? null : tmdbId
+    runSearch()
+  }
+
+  document.addEventListener('click', () => {
+    if (openTvMenuTmdbId == null) return
+    openTvMenuTmdbId = null
+    const modal = document.getElementById('searchModal')
+    if (modal.classList.contains('open')) runSearch()
+  })
+
+  async function addItem(tmdbId, type, mode, btn) {
+    const actions = btn.closest('.result-actions')
+    const buttons = actions ? [...actions.querySelectorAll('button')] : [btn]
+    buttons.forEach(el => { el.disabled = true })
+    btn.disabled = true
+    btn.textContent = 'Adding…'
+    const res = await fetch('/ui/library/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tmdbId, type, mode }),
+    })
+    const d = await res.json().catch(() => ({}))
+    if (res.ok) {
+      inLibrarySet.add(tmdbId)
+      openTvMenuTmdbId = null
+      const badge = Object.assign(document.createElement('span'), { className: 'badge-in-lib', textContent: 'In Library' })
+      if (actions) actions.replaceWith(badge)
+      else btn.replaceWith(badge)
+      showModalToast(`"${d.title}" added as ${type === 'tv' && mode === 'latest' ? 'latest season' : (type === 'tv' ? 'whole series' : 'movie')}.`, 'success')
+      Promise.all([loadStats(), loadItems()])
+    } else {
+      buttons.forEach(el => { el.disabled = false })
+      btn.innerHTML = mode === 'latest'
+        ? 'Latest Season'
+        : (type === 'tv'
+          ? 'Entire Series'
+          : `<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+               <path d="M12 5v14M5 12h14"/>
+             </svg>`)
+      showModalToast(d.error || 'Failed to add item.', 'error')
+    }
+  }
+
+  function showModalToast(msg, kind) {
+    const el = document.getElementById('modalToast')
+    el.textContent = msg
+    el.className = `modal-toast ${kind}`
+    el.style.display = ''
+    setTimeout(() => { el.style.display = 'none' }, 4000)
+  }
+</script>
+</body>
+</html>
