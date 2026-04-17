@@ -27,6 +27,13 @@ The goal is simple: open Infuse, browse your library, and press play. Fetcherr h
 - Trakt client ID and secret
 - A Trakt account
 
+## Get the Code
+
+```bash
+git clone https://github.com/goneturbo/fetcherr.git
+cd fetcherr
+```
+
 ## Setup
 
 1. Copy `.env.example` to `.env`
