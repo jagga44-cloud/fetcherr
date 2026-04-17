@@ -3,7 +3,7 @@ import {
   upsertMovie, getMovieByTmdbId, type Movie,
   upsertShow, getShowByTmdbId, type Show,
   upsertSeason, getSeasonsForShow, type Season,
-  upsertEpisode, type Episode,
+  upsertEpisode, type Episode, getAiredEpisodesForSeason,
 } from './db.js'
 
 const BASE = 'https://api.themoviedb.org/3'
@@ -356,6 +356,15 @@ export async function ensureShowSeasonsCached(show: Show): Promise<void> {
   const cachedNums = new Set(cached.map(s => s.seasonNumber))
   for (let n = 1; n <= show.numSeasons; n++) {
     if (!cachedNums.has(n)) {
+      await fetchAndCacheSeasonDetails(show.tmdbId, n)
+      continue
+    }
+
+    // Refresh already-cached seasons when aired episodes are missing stills.
+    // This lets newly aired episodes pick up thumbnails after TMDB backfills
+    // still_path without forcing all seasons to be re-fetched on every sync.
+    const airedEpisodes = getAiredEpisodesForSeason(show.tmdbId, n)
+    if (airedEpisodes.some(ep => !ep.stillPath)) {
       await fetchAndCacheSeasonDetails(show.tmdbId, n)
     }
   }

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { config } from '../config.js'
 import {
   listMovies, countMovies, getMovieByTmdbId,
-  getUserData, saveProgress, markPlayed, markUnplayed,
+  getUserData, saveProgress, markPlayed, markUnplayed, listResumeItemIds, countResumeItems,
   getEffectiveShowMode, listShows, countShows, getShowByTmdbId,
   getSeasonsForShow, getSeason, getEpisodesForSeason, getAiredEpisodesForSeason,
 } from '../db.js'
@@ -260,6 +260,35 @@ function visibleSeasonsForShow(show: Show): Season[] {
 
 function visibleAiredEpisodesForShow(show: Show): Episode[] {
   return visibleSeasonsForShow(show).flatMap(s => getAiredEpisodesForSeason(show.tmdbId, s.seasonNumber))
+}
+
+function compareEpisodeOrder(a: Pick<Episode, 'seasonNumber' | 'episodeNumber'>, b: Pick<Episode, 'seasonNumber' | 'episodeNumber'>): number {
+  if (a.seasonNumber !== b.seasonNumber) return a.seasonNumber - b.seasonNumber
+  return a.episodeNumber - b.episodeNumber
+}
+
+function findNextUpEpisode(show: Show): Episode | null {
+  const airedEpisodes = visibleAiredEpisodesForShow(show)
+  if (!airedEpisodes.length) return null
+
+  let highestPlayed: Episode | null = null
+  for (const ep of airedEpisodes) {
+    const ud = getUserData(episodeToId(show.tmdbId, ep.seasonNumber, ep.episodeNumber))
+    if (!ud.played) continue
+    if (!highestPlayed || compareEpisodeOrder(ep, highestPlayed) > 0) {
+      highestPlayed = ep
+    }
+  }
+
+  if (!highestPlayed) return null
+
+  for (const ep of airedEpisodes) {
+    if (compareEpisodeOrder(ep, highestPlayed) <= 0) continue
+    const ud = getUserData(episodeToId(show.tmdbId, ep.seasonNumber, ep.episodeNumber))
+    if (!ud.played) return ep
+  }
+
+  return null
 }
 
 function seasonToItem(season: Season, show: Show) {
@@ -636,11 +665,54 @@ export async function jellyfinRoutes(app: FastifyInstance) {
 
   app.get('/Items',           async (req) => handleItems(req as never))
   app.get('/Users/:id/Items', async (req) => handleItems(req as never))
-  app.get('/Shows/NextUp',    async () => ({ Items: [], TotalRecordCount: 0, StartIndex: 0 }))
+  app.get('/Shows/NextUp', async (req) => {
+    const rawQuery = (req as never as { query: Record<string, string> }).query
+    const q: Record<string, string> = {}
+    for (const [k, v] of Object.entries(rawQuery)) q[k.toLowerCase()] = v
+    const limit = parseInt(q.limit ?? '16', 10)
+    const offset = parseInt(q.startindex ?? '0', 10)
+
+    const nextUpItems = listShows({ limit: 100_000, ...API_LIBRARY_FILTER })
+      .map(show => {
+        const ep = findNextUpEpisode(show)
+        return ep ? { show, ep } : null
+      })
+      .filter((value): value is { show: Show; ep: Episode } => value !== null)
+      .sort((a, b) => {
+        const aDate = a.ep.airDate || ''
+        const bDate = b.ep.airDate || ''
+        if (aDate !== bDate) return bDate.localeCompare(aDate)
+        return a.show.title.localeCompare(b.show.title)
+      })
+
+    const paged = nextUpItems.slice(offset, offset + limit)
+    return {
+      Items: paged.map(({ show, ep }) => episodeToItem(ep, show)),
+      TotalRecordCount: nextUpItems.length,
+      StartIndex: offset,
+    }
+  })
 
   // Resume / Continue Watching
-  app.get('/Users/:id/Items/Resume', async () => ({ Items: [], TotalRecordCount: 0, StartIndex: 0 }))
-  app.get('/UserItems/Resume', async () => ({ Items: [], TotalRecordCount: 0, StartIndex: 0 }))
+  async function handleResumeItems(req: { query: Record<string, string> }) {
+    const q: Record<string, string> = {}
+    for (const [k, v] of Object.entries(req.query)) q[k.toLowerCase()] = v
+    const limit = q.limit ? parseInt(q.limit, 10) : 50
+    const offset = q.startindex ? parseInt(q.startindex, 10) : 0
+    const ids = listResumeItemIds(limit, offset)
+    const items = []
+    for (const id of ids) {
+      const item = await handleItem(id, {
+        code: () => ({ send: () => null }),
+      })
+      if (item && typeof item === 'object' && (item as Record<string, unknown>).Type !== 'Season' && (item as Record<string, unknown>).Type !== 'Series') {
+        items.push(item)
+      }
+    }
+    return { Items: items, TotalRecordCount: countResumeItems(), StartIndex: offset }
+  }
+  app.get('/Users/:id/Items/Resume', async (req) => handleResumeItems(req as never))
+  app.get('/UserItems/Resume', async (req) => handleResumeItems(req as never))
 
   // Latest / Recently Added
   app.get('/Users/:id/Items/Latest', async (req) => {
@@ -847,7 +919,12 @@ export async function jellyfinRoutes(app: FastifyInstance) {
     const body = (req as never as { body: Record<string, unknown> }).body
     const itemId       = body?.ItemId       as string | undefined
     const positionTicks = body?.PositionTicks as number | undefined
-    if (itemId && positionTicks != null) saveProgress(itemId, positionTicks)
+    if (itemId && positionTicks != null) {
+      saveProgress(itemId, positionTicks)
+      app.log.info(`progress: saved ${itemId} at ${positionTicks} ticks`)
+    } else {
+      app.log.warn(`progress: missing item or position in /Sessions/Playing/Progress payload`)
+    }
     return {}
   })
   app.post('/Sessions/Playing/Stopped', async (req) => {
@@ -856,8 +933,15 @@ export async function jellyfinRoutes(app: FastifyInstance) {
     const positionTicks     = body?.PositionTicks      as number  | undefined
     const playedToCompletion = body?.PlayedToCompletion as boolean | undefined
     if (itemId) {
-      if (playedToCompletion) markPlayed(itemId)
-      else if (positionTicks != null) saveProgress(itemId, positionTicks)
+      if (playedToCompletion) {
+        markPlayed(itemId)
+        app.log.info(`progress: marked played ${itemId}`)
+      } else if (positionTicks != null) {
+        saveProgress(itemId, positionTicks)
+        app.log.info(`progress: stopped ${itemId} at ${positionTicks} ticks`)
+      } else {
+        app.log.warn(`progress: missing stop position for ${itemId}`)
+      }
     }
     return {}
   })

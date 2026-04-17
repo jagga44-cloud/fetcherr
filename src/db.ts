@@ -884,10 +884,38 @@ export function saveProgress(itemId: string, positionTicks: number): void {
     return
   }
   getDb().prepare(`
-    INSERT INTO user_data (item_id, position_ticks)
-    VALUES (?, ?)
+    INSERT INTO user_data (item_id, played, position_ticks, last_played_date)
+    VALUES (?, 0, ?, ?)
     ON CONFLICT(item_id) DO UPDATE SET position_ticks = excluded.position_ticks
-  `).run(itemId, positionTicks)
+                                        , played = 0
+                                        , last_played_date = excluded.last_played_date
+  `).run(itemId, positionTicks, new Date().toISOString())
+}
+
+export function listResumeItemIds(limit = 50, offset = 0): string[] {
+  const rows = getDb().prepare(`
+    SELECT item_id
+    FROM user_data
+    WHERE position_ticks >= ?
+      AND played = 0
+    ORDER BY
+      CASE WHEN last_played_date = '' THEN 1 ELSE 0 END,
+      last_played_date DESC,
+      item_id ASC
+    LIMIT ?
+    OFFSET ?
+  `).all(MIN_RESUME_TICKS, limit, offset) as Array<{ item_id: string }>
+  return rows.map(r => r.item_id)
+}
+
+export function countResumeItems(): number {
+  const row = getDb().prepare(`
+    SELECT COUNT(*) AS n
+    FROM user_data
+    WHERE position_ticks >= ?
+      AND played = 0
+  `).get(MIN_RESUME_TICKS) as { n: number }
+  return row.n
 }
 
 export function markPlayed(itemId: string): void {
