@@ -124,6 +124,22 @@ function episodeExternalUrls(showTmdbId: number, seasonNumber: number, episodeNu
   }]
 }
 
+function userDataForItem(itemId: string, ud: { played: boolean; playCount: number; positionTicks: number; lastPlayedDate: string }, runtimeTicks = 0) {
+  const playedPercentage = runtimeTicks > 0
+    ? Math.max(0, Math.min(100, (ud.positionTicks / runtimeTicks) * 100))
+    : undefined
+  return {
+    PlayedPercentage:      playedPercentage,
+    PlaybackPositionTicks: ud.positionTicks,
+    PlayCount:             ud.playCount,
+    IsFavorite:            false,
+    LastPlayedDate:        ud.lastPlayedDate || undefined,
+    Played:                ud.played,
+    Key:                   itemId,
+    ItemId:                itemId,
+  }
+}
+
 function movieToItem(m: Movie) {
   const genres: string[] = JSON.parse(m.genres || '[]')
   const runtimeTicks = (m.runtimeMins || 90) * 60 * 10_000_000
@@ -185,14 +201,7 @@ function movieToItem(m: Movie) {
       RequiresClosing:      false,
     }],
     ProviderIds:        { Imdb: m.imdbId || undefined, Tmdb: String(m.tmdbId) },
-    UserData: {
-      PlaybackPositionTicks: ud.positionTicks,
-      PlayCount:             ud.playCount,
-      IsFavorite:            false,
-      Played:                ud.played,
-      LastPlayedDate:        ud.lastPlayedDate || undefined,
-      Key:                   id,
-    },
+    UserData:           userDataForItem(id, ud, runtimeTicks),
   }
 }
 
@@ -240,14 +249,7 @@ function showToSeriesItem(s: Show) {
     BackdropImageTags:  s.backdropPath ? [s.backdropPath.replace(/\W/g, '').slice(0, 16)] : [],
     ParentId:           SHOWS_FOLDER_ID,
     ProviderIds:        { Imdb: s.imdbId || undefined, Tmdb: String(s.tmdbId) },
-    UserData: {
-      PlaybackPositionTicks: ud.positionTicks,
-      PlayCount:             ud.playCount,
-      IsFavorite:            false,
-      Played:                ud.played,
-      LastPlayedDate:        ud.lastPlayedDate || undefined,
-      Key:                   id,
-    },
+    UserData:           userDataForItem(id, ud),
   }
 }
 
@@ -319,14 +321,7 @@ function seasonToItem(season: Season, show: Show) {
     PrimaryImageTag:    season.posterPath ? 'poster' : undefined,
     BackdropImageTags:  [],
     ParentId:           seriesId,
-    UserData: {
-      PlaybackPositionTicks: ud.positionTicks,
-      PlayCount:             ud.playCount,
-      IsFavorite:            false,
-      Played:                ud.played,
-      LastPlayedDate:        ud.lastPlayedDate || undefined,
-      Key:                   id,
-    },
+    UserData:           userDataForItem(id, ud),
   }
 }
 
@@ -405,14 +400,7 @@ function episodeToItem(ep: Episode, show: Show) {
       RequiresOpening:      false,
       RequiresClosing:      false,
     }],
-    UserData: {
-      PlaybackPositionTicks: ud.positionTicks,
-      PlayCount:             ud.playCount,
-      IsFavorite:            false,
-      Played:                ud.played,
-      LastPlayedDate:        ud.lastPlayedDate || undefined,
-      Key:                   id,
-    },
+    UserData:              userDataForItem(id, ud, runtimeTicks),
   }
 }
 

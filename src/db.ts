@@ -880,6 +880,8 @@ export function clearProgress(itemId: string): void {
 
 export function saveProgress(itemId: string, positionTicks: number): void {
   if (positionTicks < MIN_RESUME_TICKS) {
+    const existing = getUserData(itemId)
+    if (existing.positionTicks >= MIN_RESUME_TICKS) return
     clearProgress(itemId)
     return
   }
