@@ -42,6 +42,7 @@ wrapFastifyLogger(app)
 
 // Register routes
 await app.register(jellyfinRoutes)
+await app.register(jellyfinRoutes, { prefix: '/emby' })
 await app.register(castRoutes)
 await app.register(uiRoutes)
 
